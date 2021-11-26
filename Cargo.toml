@@ -1,5 +1,5 @@
 [package]
-name = "fuse-rs"
+name = "nn-fuse"
 version = "0.1.0"
 authors = ["Raytwo <raytwo@arcropolis.com>, blujay <the.blu.dev@gmail.com>"]
 edition = "2018"
