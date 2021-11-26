@@ -18,18 +18,18 @@ impl<F: FsFileAccessor> FileAccessor<F> {
 }
 
 #[repr(C)]
-struct FileAccessorVtable<A: FsFileAccessor> {
+struct FileAccessorVtable<F: FsFileAccessor> {
     // also type info at VTable - 0x8
-    destructor: extern "C" fn(&mut A),
-    deleter: extern "C" fn(&mut A),
+    destructor: extern "C" fn(&mut F),
+    deleter: extern "C" fn(&mut F),
     // this, out_size, offset, buffer, buffer_size, read_options
-    read: extern "C" fn(&mut A, &mut usize, isize, *mut u8, usize, u32) -> AccessorResult,
-    write: extern "C" fn(&mut A, isize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
-    flush: extern "C" fn(&mut A) -> AccessorResult,
-    set_size: extern "C" fn(&mut A, usize) -> AccessorResult,
-    get_size: extern "C" fn(&mut A, &mut usize) -> AccessorResult,
+    read: extern "C" fn(&mut F, &mut usize, isize, *mut u8, usize, u32) -> AccessorResult,
+    write: extern "C" fn(&mut F, isize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
+    flush: extern "C" fn(&mut F) -> AccessorResult,
+    set_size: extern "C" fn(&mut F, usize) -> AccessorResult,
+    get_size: extern "C" fn(&mut F, &mut usize) -> AccessorResult,
     // more here but no clue what they are
-    operate_range: extern "C" fn(&mut A, ) -> AccessorResult
+    operate_range: extern "C" fn(&mut F, ) -> AccessorResult
 }
 
 impl<F: FsFileAccessor> FileAccessorVtable<F> {
