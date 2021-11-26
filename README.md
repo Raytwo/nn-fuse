@@ -1,1 +1,1 @@
-fuse-rs
+nn-fuse
