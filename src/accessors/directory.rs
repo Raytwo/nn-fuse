@@ -24,8 +24,8 @@ struct DirectoryAccessorVtable<D: FsDirectoryAccessor> {
     release: extern "C" fn(&mut D),
     get_proxy_info: extern "C" fn(&mut D),
     get_interface_type_info: extern "C" fn(&mut D),
-    do_read: extern "C" fn(&mut D, &mut isize, *mut nn::fs::DirectoryEntry, usize) -> AccessorResult,
-    do_get_entry_count: extern "C" fn(&mut D, &mut isize) -> AccessorResult
+    read: extern "C" fn(&mut D, &mut isize, *mut nn::fs::DirectoryEntry, usize) -> AccessorResult,
+    get_entry_count: extern "C" fn(&mut D, &mut isize) -> AccessorResult
 }
 
 impl<D: FsDirectoryAccessor> DirectoryAccessorVtable<D> {
@@ -35,8 +35,8 @@ impl<D: FsDirectoryAccessor> DirectoryAccessorVtable<D> {
             release: D::release,
             get_proxy_info: D::get_proxy_info,
             get_interface_type_info: D::get_interface_type_info,
-            do_read: D::do_read,
-            do_get_entry_count: D::do_get_entry_count,
+            read: D::read,
+            get_entry_count: D::get_entry_count,
         }
     }
 }
@@ -47,10 +47,10 @@ pub trait FsDirectoryAccessor {
     extern "C" fn release(&mut self);
     extern "C" fn get_proxy_info(&mut self);
     extern "C" fn get_interface_type_info(&mut self);
-    extern "C" fn do_read(&mut self, out_count: &mut isize, buffer: *mut nn::fs::DirectoryEntry, buffer_len: usize) -> AccessorResult {
+    extern "C" fn read(&mut self, out_count: &mut isize, buffer: *mut nn::fs::DirectoryEntry, buffer_len: usize) -> AccessorResult {
         AccessorResult::Unimplemented
     }
-    extern "C" fn do_get_entry_count(&mut self, out_count: &mut isize) -> AccessorResult {
+    extern "C" fn get_entry_count(&mut self, out_count: &mut isize) -> AccessorResult {
         AccessorResult::Unimplemented
     }
 }

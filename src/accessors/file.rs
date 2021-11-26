@@ -23,13 +23,13 @@ struct FileAccessorVtable<A: FsFileAccessor> {
     destructor: extern "C" fn(&mut A),
     deleter: extern "C" fn(&mut A),
     // this, out_size, offset, buffer, buffer_size, read_options
-    do_read: extern "C" fn(&mut A, &mut usize, isize, *mut u8, usize, u32) -> AccessorResult,
-    do_write: extern "C" fn(&mut A, isize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
-    do_flush: extern "C" fn(&mut A) -> AccessorResult,
-    do_set_size: extern "C" fn(&mut A, usize) -> AccessorResult,
-    do_get_size: extern "C" fn(&mut A, &mut usize) -> AccessorResult,
+    read: extern "C" fn(&mut A, &mut usize, isize, *mut u8, usize, u32) -> AccessorResult,
+    write: extern "C" fn(&mut A, isize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
+    flush: extern "C" fn(&mut A) -> AccessorResult,
+    set_size: extern "C" fn(&mut A, usize) -> AccessorResult,
+    get_size: extern "C" fn(&mut A, &mut usize) -> AccessorResult,
     // more here but no clue what they are
-    do_operate_range: extern "C" fn(&mut A, ) -> AccessorResult
+    operate_range: extern "C" fn(&mut A, ) -> AccessorResult
 }
 
 impl<F: FsFileAccessor> FileAccessorVtable<F> {
@@ -37,12 +37,12 @@ impl<F: FsFileAccessor> FileAccessorVtable<F> {
         Self {
             destructor: F::destructor,
             deleter: F::deleter,
-            do_read: F::do_read,
-            do_write: F::do_write,
-            do_flush: F::do_flush,
-            do_set_size: F::do_set_size,
-            do_get_size: F::do_get_size,
-            do_operate_range: F::do_operate_range,
+            read: F::read,
+            write: F::write,
+            flush: F::flush,
+            set_size: F::set_size,
+            get_size: F::get_size,
+            operate_range: F::operate_range,
         }
     }
 }
@@ -55,23 +55,23 @@ pub trait FsFileAccessor {
         fs::detail::free(self as *mut Self); 
     }
     // this, out_size, offset, buffer, buffer_size, read_options
-    extern "C" fn do_read(&mut self, out_size: &mut usize, offset: isize, buffer: *mut u8, buffer_len: usize, read_options: u32) -> AccessorResult {
+    extern "C" fn read(&mut self, out_size: &mut usize, offset: isize, buffer: *mut u8, buffer_len: usize, read_options: u32) -> AccessorResult {
         AccessorResult::Unimplemented
     }
-    extern "C" fn do_write(&mut self, offset: isize, buffer: *const u8, buffer_len: usize, write_options: &nn::fs::WriteOption) -> AccessorResult {
+    extern "C" fn write(&mut self, offset: isize, buffer: *const u8, buffer_len: usize, write_options: &nn::fs::WriteOption) -> AccessorResult {
         AccessorResult::Unimplemented
     }
-    extern "C" fn do_flush(&mut self) -> AccessorResult {
+    extern "C" fn flush(&mut self) -> AccessorResult {
         AccessorResult::Unimplemented
     }
-    extern "C" fn do_set_size(&mut self, size: usize) -> AccessorResult {
+    extern "C" fn set_size(&mut self, size: usize) -> AccessorResult {
         AccessorResult::Unimplemented
     }
-    extern "C" fn do_get_size(&mut self, out_size: &mut usize) -> AccessorResult {
+    extern "C" fn get_size(&mut self, out_size: &mut usize) -> AccessorResult {
         AccessorResult::Unimplemented
     }
     // more here but no clue what they are
-    extern "C" fn do_operate_range(&mut self) -> AccessorResult {
+    extern "C" fn operate_range(&mut self) -> AccessorResult {
         AccessorResult::Unimplemented
     }
 }
