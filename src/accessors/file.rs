@@ -62,7 +62,7 @@ impl FAccessor {
         match self.accessor.read(buffer, offset) {
             Ok(size) => {
                 *read_size = size;
-                AccessorResult::Ok
+                AccessorResult::Success
             },
             Err(e) => e
         }
@@ -76,7 +76,7 @@ impl FAccessor {
         };
 
         match self.accessor.write(data, offset, true) {
-            Ok(_) => AccessorResult::Ok,
+            Ok(_) => AccessorResult::Success,
             Err(e) => e
         }
     }
@@ -91,7 +91,7 @@ impl FAccessor {
         println!("FAccessor::set_size");
 
         match self.accessor.set_size(new_size) {
-            Ok(()) => AccessorResult::Ok,
+            Ok(()) => AccessorResult::Success,
             Err(e) => e
         }
     }
@@ -102,7 +102,7 @@ impl FAccessor {
         match unsafe { (*self.accessor).get_size() } {
             Ok(size) => {
                 *out_size = size;
-                AccessorResult::Ok
+                AccessorResult::Success
             },
             Err(e) => e
         }

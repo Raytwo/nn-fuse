@@ -11,9 +11,14 @@ pub enum FsEntryType {
 
 #[repr(u32)]
 pub enum AccessorResult {
-    Ok = 0,
-    PathDoNotExists = 0x202,
+    Success = 0,
+    PathNotFound = 0x202,
+    PathAlreadyExists = 0x402,
+    AlreadyInUse = 0xe02,
+    DirectoryNotEmpty = 0x1002,
+    OutOfSpace = 0x3c02,
     Unimplemented = 0x177202,
+    Unexpected = 0x271002,
     Unsupported = 0x31b802,
 }
 
