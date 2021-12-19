@@ -6,9 +6,10 @@ mod file;
 mod directory;
 
 pub use file::{ FileAccessor, FAccessor };
-//pub use directory::{ DirectoryAccessor, FsDirectoryAccessor };
 
 use skyline::{nn, println};
+
+pub use directory::DAccessor;
 
 #[repr(C)]
 struct FsAccessorVtable {
@@ -26,7 +27,7 @@ struct FsAccessorVtable {
     get_free_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
     get_total_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
     open_file: extern "C" fn (&mut FsAccessor, *mut *mut FAccessor, *const u8, nn::fs::OpenMode) -> AccessorResult, // *mut *mut is actually std::unique_ptr
-    open_directory: extern "C" fn (&mut FsAccessor, &mut &mut u8, *const u8, nn::fs::OpenDirectoryMode) -> AccessorResult,
+    open_directory: extern "C" fn (&mut FsAccessor, *mut *mut DAccessor, *const u8, nn::fs::OpenDirectoryMode) -> AccessorResult,
     commit: extern "C" fn (&mut FsAccessor) -> AccessorResult,
     commit_provisionally: extern "C" fn (&mut FsAccessor, u64) -> AccessorResult,
     rollback: extern "C" fn (&mut FsAccessor) -> AccessorResult,
@@ -162,7 +163,7 @@ impl FsAccessor {
         println!("FsAccessor::open_file");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
-        match self.accessor.open(&filepath.strip_prefix("/").unwrap(), mode) {
+        match self.accessor.open_file(&filepath.strip_prefix("/").unwrap(), mode) {
             Ok(mut accessor) => {
                 unsafe { *file_accessor = &mut *accessor };
                 AccessorResult::Ok
@@ -171,10 +172,17 @@ impl FsAccessor {
         }
     }
 
-    extern "C" fn open_directory(&mut self, directory_accessor: &mut &mut u8, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
-        panic!("FsAccessor");
+    extern "C" fn open_directory(&mut self, directory_accessor: *mut *mut DAccessor, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
+        println!("FsAccessor::open_directory");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
-        AccessorResult::Unimplemented
+        match self.accessor.open_directory(&filepath.strip_prefix("/").unwrap(), mode) {
+            Ok(mut accessor) => {
+                unsafe { *directory_accessor = &mut *accessor };
+                AccessorResult::Ok
+            },
+            Err(e) => e,
+        }
     }
 
     extern "C" fn commit(&mut self) -> AccessorResult {
@@ -216,5 +224,6 @@ impl FsAccessor {
 
 pub trait FileSystemAccessor {
     fn get_entry_type(&self, path: &std::path::Path) -> Result<FsEntryType, AccessorResult>;
-    fn open(&self, path: &std::path::Path, mode: nn::fs::OpenMode) -> Result<*mut FAccessor, AccessorResult>;
+    fn open_file(&self, path: &std::path::Path, mode: nn::fs::OpenMode) -> Result<*mut FAccessor, AccessorResult>;
+    fn open_directory(&self, path: &std::path::Path, mode: nn::fs::OpenDirectoryMode) -> Result<*mut DAccessor, AccessorResult>;
 }
