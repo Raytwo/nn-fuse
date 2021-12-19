@@ -19,8 +19,8 @@ struct FsAccessorVtable {
     delete_directory: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
     delete_directory_recursively: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
     clean_directory_recursively: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
-    rename_file: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
-    rename_directory: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    rename_file: extern "C" fn (&mut FsAccessor, *const u8, *const u8) -> AccessorResult,
+    rename_directory: extern "C" fn (&mut FsAccessor, *const u8, *const u8) -> AccessorResult,
     get_entry_type: extern "C" fn (&mut FsAccessor, &mut FsEntryType, *const u8) -> AccessorResult,
     get_free_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
     get_total_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
@@ -120,16 +120,21 @@ impl FsAccessor {
         AccessorResult::Unimplemented
     }
 
-    extern "C" fn rename_file(&mut self, path: *const u8) -> AccessorResult {
-        panic!("FsAccessor");
+    extern "C" fn rename_file(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
+        println!("FsAccessor::rename_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+        let new_filepath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
 
-        AccessorResult::Unimplemented
+        self.accessor.rename_file(&filepath, &new_filepath)
     }
 
-    extern "C" fn rename_directory(&mut self, path: *const u8) -> AccessorResult {
-        panic!("FsAccessor");
+    extern "C" fn rename_directory(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
+        println!("FsAccessor::rename_directory");
 
-        AccessorResult::Unimplemented
+        let dir_path: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+        let new_dirpath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
+
+        self.accessor.rename_directory(&dir_path, &new_dirpath)
     }
 
     extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
@@ -224,4 +229,10 @@ pub trait FileSystemAccessor {
     fn get_entry_type(&self, path: &std::path::Path) -> Result<FsEntryType, AccessorResult>;
     fn open_file(&self, path: &std::path::Path, mode: nn::fs::OpenMode) -> Result<*mut FAccessor, AccessorResult>;
     fn open_directory(&self, path: &std::path::Path, mode: nn::fs::OpenDirectoryMode) -> Result<*mut DAccessor, AccessorResult>;
+    fn rename_file(&self, path: &std::path::Path, new_path: &std::path::Path) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
+    fn rename_directory(&self, path: &std::path::Path, new_path: &std::path::Path) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
 }
