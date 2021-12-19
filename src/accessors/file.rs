@@ -6,8 +6,8 @@ use skyline::nn;
 struct FileAccessorVtable {
     destructor: extern "C" fn(&mut FAccessor),
     deleter: extern "C" fn(&mut FAccessor),
-    read: extern "C" fn(&mut FAccessor, &mut usize, isize, *mut u8, usize, u32) -> AccessorResult,
-    write: extern "C" fn(&mut FAccessor, isize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
+    read: extern "C" fn(&mut FAccessor, &mut usize, usize, *mut u8, usize, u32) -> AccessorResult,
+    write: extern "C" fn(&mut FAccessor, usize, *const u8, usize, &nn::fs::WriteOption) -> AccessorResult,
     flush: extern "C" fn(&mut FAccessor) -> AccessorResult,
     set_size: extern "C" fn(&mut FAccessor, usize) -> AccessorResult,
     get_size: extern "C" fn(&mut FAccessor, &mut usize) -> AccessorResult,
@@ -57,7 +57,7 @@ impl FAccessor {
         fs::detail::free(self);
     }
 
-    extern "C" fn read(&mut self, read_size: &mut usize, offset: isize, buffer: *mut u8, buffer_len: usize, read_options: u32) -> AccessorResult {
+    extern "C" fn read(&mut self, read_size: &mut usize, offset: usize, buffer: *mut u8, buffer_len: usize, read_options: u32) -> AccessorResult {
         println!("FAccessor::read");
         let buffer = unsafe { std::slice::from_raw_parts_mut(buffer, buffer_len) };
         
@@ -70,7 +70,7 @@ impl FAccessor {
         }
     }
 
-    extern "C" fn write(&mut self, offset: isize, data: *const u8, data_len: usize, write_options: &nn::fs::WriteOption) -> AccessorResult {
+    extern "C" fn write(&mut self, offset: usize, data: *const u8, data_len: usize, write_options: &nn::fs::WriteOption) -> AccessorResult {
         println!("FAccessor::write");
 
         let data = unsafe {
@@ -118,9 +118,9 @@ impl FAccessor {
 }
 
 pub trait FileAccessor {
-    fn read(&mut self, buffer: &mut [u8], offset: isize) -> Result<usize, AccessorResult>;
+    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, AccessorResult>;
 
-    fn write(&mut self, data: &[u8], offset: isize, should_append: bool) -> Result<(), AccessorResult> {
+    fn write(&mut self, data: &[u8], offset: usize, should_append: bool) -> Result<(), AccessorResult> {
         Err(AccessorResult::Unsupported)
     }
 
