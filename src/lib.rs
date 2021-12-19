@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_extra)]
+
 mod accessors;
 pub use accessors::*;
 
@@ -10,7 +12,7 @@ pub enum FsEntryType {
 #[repr(u32)]
 pub enum AccessorResult {
     Ok = 0,
-    PathDne = 0x202,
+    PathDoNotExists = 0x202,
     Unimplemented = 0x177202,
     Unsupported = 0x31b802,
 }
@@ -18,6 +20,7 @@ pub enum AccessorResult {
 pub mod fs {
     pub mod detail {
         use skyline::libc::{c_char, c_void};
+        use std::mem::MaybeUninit;
 
         extern "C" {
             #[link_name = "\u{1}_ZN2nn2fs6detail8AllocateEm"]
@@ -65,7 +68,7 @@ pub mod fs {
     }
 }
 
-pub fn mount<A: FsAccessor>(mount_name: &str, accessor: &mut FileSystemAccessor<A>) -> Result<(), std::io::Error>{
+pub fn mount(mount_name: &str, accessor: &mut FsAccessor) -> Result<(), std::io::Error>{
     if fs::detail::is_mount_available(mount_name) {
         if fs::fsa::register(mount_name, accessor) != 0 {
             Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to mount the filesystem accessor"))
@@ -73,6 +76,6 @@ pub fn mount<A: FsAccessor>(mount_name: &str, accessor: &mut FileSystemAccessor<
             Ok(())
         }
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "This mount point specified is unavailable"))
+        Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "The mount point provided is unavailable"))
     }
 }

@@ -1,146 +1,220 @@
+use std::ffi::CStr;
+
 use crate::{ fs, AccessorResult, FsEntryType };
 
 mod file;
 mod directory;
 
-pub use file::{ FileAccessor, FsFileAccessor };
-pub use directory::{ DirectoryAccessor, FsDirectoryAccessor };
+pub use file::{ FileAccessor, FAccessor };
+//pub use directory::{ DirectoryAccessor, FsDirectoryAccessor };
 
-use skyline::nn;
+use skyline::{nn, println};
 
 #[repr(C)]
-pub struct FileSystemAccessor<A: FsAccessor> {
-    vtable: *const FsAccessorVtable<A>,
+struct FsAccessorVtable {
+    destructor: extern "C" fn (&mut FsAccessor),
+    deleter: extern "C" fn (&mut FsAccessor),
+    create_file: extern "C" fn (&mut FsAccessor, *const u8, usize, i32) -> AccessorResult,
+    delete_file: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    create_directory: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    delete_directory: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    delete_directory_recursively: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    clean_directory_recursively: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    rename_file: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    rename_directory: extern "C" fn (&mut FsAccessor, *const u8) -> AccessorResult,
+    get_entry_type: extern "C" fn (&mut FsAccessor, &mut FsEntryType, *const u8) -> AccessorResult,
+    get_free_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
+    get_total_space_size: extern "C" fn (&mut FsAccessor, &mut usize, *const u8) -> AccessorResult,
+    open_file: extern "C" fn (&mut FsAccessor, *mut *mut FAccessor, *const u8, nn::fs::OpenMode) -> AccessorResult, // *mut *mut is actually std::unique_ptr
+    open_directory: extern "C" fn (&mut FsAccessor, &mut &mut u8, *const u8, nn::fs::OpenDirectoryMode) -> AccessorResult,
+    commit: extern "C" fn (&mut FsAccessor) -> AccessorResult,
+    commit_provisionally: extern "C" fn (&mut FsAccessor, u64) -> AccessorResult,
+    rollback: extern "C" fn (&mut FsAccessor) -> AccessorResult,
+    flush: extern "C" fn (&mut FsAccessor) -> AccessorResult,
+    get_file_time_stamp_raw: extern "C" fn (&mut FsAccessor, *mut u64, *const u8) -> AccessorResult, // takes *mut nn::fs::FileTimeStampRaw
+    query_entry: extern "C" fn (&mut FsAccessor,) -> AccessorResult // more args but idgaf 
 }
 
-impl<A: FsAccessor> FileSystemAccessor<A> {
-    pub fn new() -> *mut Self {
+static FSACCESSOR_VTABLE: FsAccessorVtable  = FsAccessorVtable {
+    destructor: FsAccessor::destructor,
+    deleter: FsAccessor::deleter,
+    create_file: FsAccessor::create_file,
+    delete_file: FsAccessor::delete_file,
+    create_directory: FsAccessor::create_directory,
+    delete_directory: FsAccessor::delete_directory,
+    delete_directory_recursively: FsAccessor::delete_directory_recursively,
+    clean_directory_recursively: FsAccessor::clean_directory_recursively,
+    rename_file: FsAccessor::rename_file,
+    rename_directory: FsAccessor::rename_directory,
+    get_entry_type: FsAccessor::get_entry_type,
+    get_free_space_size: FsAccessor::get_free_space_size,
+    get_total_space_size: FsAccessor::get_total_space_size,
+    open_file: FsAccessor::open_file,
+    open_directory: FsAccessor::open_directory,
+    commit: FsAccessor::commit,
+    commit_provisionally: FsAccessor::commit_provisionally,
+    rollback: FsAccessor::rollback,
+    flush: FsAccessor::flush,
+    get_file_time_stamp_raw: FsAccessor::get_file_time_stamp_raw,
+    query_entry: FsAccessor::query_entry,
+};
+
+#[repr(C)]
+pub struct FsAccessor {
+    vtable: &'static FsAccessorVtable,
+    accessor: Box<dyn FileSystemAccessor>,
+}
+
+impl FsAccessor {
+    pub fn new<A: FileSystemAccessor + 'static>(accessor: A) -> *mut Self {
         let out = fs::detail::alloc::<Self>();
+
+        // SAFETY: Do not change this way of assigning the values in case of refactoring. Dereferencing `out` to assign a new instance of the struct would call the destructor for the Box field, which is uninitialized, and cause a crash.
         unsafe {
-            (*out).vtable = std::boxed::Box::leak(std::boxed::Box::new(FsAccessorVtable::new())) as *const FsAccessorVtable<A>
+            out.write(Self {
+                vtable: &FSACCESSOR_VTABLE,
+                accessor: Box::new(accessor) as _
+            });
         }
+
+        let out: *mut FsAccessor = unsafe { std::mem::transmute(out) };
         out
     }
-}
 
-#[repr(C)]
-struct FsAccessorVtable<A: FsAccessor> {
-    destructor: extern "C" fn (&mut A),
-    deleter: extern "C" fn (&mut A),
-    create_file: extern "C" fn (&mut A, *const u8, usize, i32) -> AccessorResult,
-    delete_file: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    create_directory: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    delete_directory: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    delete_directory_recursively: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    clean_directory_recursively: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    rename_file: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    rename_directory: extern "C" fn (&mut A, *const u8) -> AccessorResult,
-    get_entry_type: extern "C" fn (&mut A, &mut FsEntryType, *const u8) -> AccessorResult,
-    get_free_space_size: extern "C" fn (&mut A, &mut usize, *const u8) -> AccessorResult,
-    get_total_space_size: extern "C" fn (&mut A, &mut usize, *const u8) -> AccessorResult,
-    open_file: extern "C" fn (&mut A, &mut &mut A::FAccessor, *const u8, nn::fs::OpenMode) -> AccessorResult, // *mut *mut is actually std::unique_ptr
-    open_directory: extern "C" fn (&mut A, &mut &mut A::DAccessor, *const u8, nn::fs::OpenDirectoryMode) -> AccessorResult,
-    commit: extern "C" fn (&mut A) -> AccessorResult,
-    commit_provisionally: extern "C" fn (&mut A, u64) -> AccessorResult,
-    rollback: extern "C" fn (&mut A) -> AccessorResult,
-    flush: extern "C" fn (&mut A) -> AccessorResult,
-    get_file_time_stamp_raw: extern "C" fn (&mut A, *mut u64, *const u8) -> AccessorResult, // takes *mut nn::fs::FileTimeStampRaw
-    query_entry: extern "C" fn (&mut A,) -> AccessorResult // more args but idgaf 
-}
+    extern "C" fn destructor(&mut self) {}
 
-impl<A: FsAccessor> FsAccessorVtable<A> {
-    fn new() -> Self {
-        Self {
-            destructor: A::destructor,
-            deleter: A::deleter,
-            create_file: A::create_file,
-            delete_file: A::delete_file,
-            create_directory: A::create_directory,
-            delete_directory: A::delete_directory,
-            delete_directory_recursively: A::delete_directory_recursively,
-            clean_directory_recursively: A::clean_directory_recursively,
-            rename_file: A::rename_file,
-            rename_directory: A::rename_directory,
-            get_entry_type: A::get_entry_type,
-            get_free_space_size: A::get_free_space_size,
-            get_total_space_size: A::get_total_space_size,
-            open_file: A::open_file,
-            open_directory: A::open_directory,
-            commit: A::commit,
-            commit_provisionally: A::commit_provisionally,
-            rollback: A::rollback,
-            flush: A::flush,
-            get_file_time_stamp_raw: A::get_file_time_stamp_raw,
-            query_entry: A::query_entry,
+    extern "C" fn deleter(&mut self) {
+        self.destructor();
+        fs::detail::free(self);   
+    }
+
+    extern "C" fn create_file(&mut self, path: *const u8, size: usize, mode: i32) -> AccessorResult {
+        panic!("FsAccessor");
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn delete_file(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn create_directory(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn delete_directory(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn delete_directory_recursively(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn clean_directory_recursively(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn rename_file(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn rename_directory(&mut self, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
+        println!("FsAccessor::get_entry_type");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        match self.accessor.get_entry_type(&filepath.strip_prefix("/").unwrap()) {
+            Ok(result) => {
+                *entry_type = result;
+                AccessorResult::Ok
+            },
+            Err(e) => e,
         }
     }
+
+    extern "C" fn get_free_space_size(&mut self, out_size: &mut usize, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn get_total_space_size(&mut self, out_size: &mut usize, path: *const u8) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn open_file(&mut self, file_accessor: *mut *mut FAccessor, path: *const u8, mode: nn::fs::OpenMode) -> AccessorResult { // unique_accessor is actually std::unique_ptr
+        println!("FsAccessor::open_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        match self.accessor.open(&filepath.strip_prefix("/").unwrap(), mode) {
+            Ok(mut accessor) => {
+                unsafe { *file_accessor = &mut *accessor };
+                AccessorResult::Ok
+            },
+            Err(e) => e,
+        }
+    }
+
+    extern "C" fn open_directory(&mut self, directory_accessor: &mut &mut u8, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn commit(&mut self) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn commit_provisionally(&mut self, arg: u64) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn rollback(&mut self) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn flush(&mut self) -> AccessorResult {
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+
+    extern "C" fn get_file_time_stamp_raw(&mut self, timestamp_out: *mut u64, path: *const u8) -> AccessorResult { // takes *mut nn::fs::FileTimeStampRaw
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
+    
+    extern "C" fn query_entry(&mut self) -> AccessorResult { // more args but idgaf 
+        panic!("FsAccessor");
+
+        AccessorResult::Unimplemented
+    }
 }
 
-pub trait FsAccessor {
-    type FAccessor: FsFileAccessor;
-    type DAccessor: FsDirectoryAccessor;
-
-    extern "C" fn destructor(&mut self);
-    extern "C" fn deleter(&mut self) where Self: Sized {
-        self.destructor();
-        fs::detail::free(self as *mut Self);   
-    }
-    extern "C" fn create_file(&mut self, path: *const u8, size: usize, mode: i32) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn delete_file(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn create_directory(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn delete_directory(&mut self, path: *const u8) -> AccessorResult;
-    extern "C" fn delete_directory_recursively(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn clean_directory_recursively(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn rename_file(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn rename_directory(&mut self, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn get_free_space_size(&mut self, out_size: &mut usize, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn get_total_space_size(&mut self, out_size: &mut usize, path: *const u8) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn open_file(&mut self, file_accessor: &mut &mut Self::FAccessor, path: *const u8, mode: nn::fs::OpenMode) -> AccessorResult { // unique_accessor is actually std::unique_ptr
-        let accessor = FileAccessor::<Self::FAccessor>::new();
-        *file_accessor = unsafe { &mut *(accessor as *mut Self::FAccessor) };
-
-        AccessorResult::Ok
-    }
-    extern "C" fn open_directory(&mut self, directory_accessor: &mut &mut Self::DAccessor, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn commit(&mut self) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn commit_provisionally(&mut self, arg: u64) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn rollback(&mut self) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn flush(&mut self) -> AccessorResult {
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn get_file_time_stamp_raw(&mut self, timestamp_out: *mut u64, path: *const u8) -> AccessorResult { // takes *mut nn::fs::FileTimeStampRaw
-        AccessorResult::Unimplemented
-    }
-    extern "C" fn query_entry(&mut self) -> AccessorResult { // more args but idgaf 
-        AccessorResult::Unimplemented
-    }
+pub trait FileSystemAccessor {
+    fn get_entry_type(&self, path: &std::path::Path) -> Result<FsEntryType, AccessorResult>;
+    fn open(&self, path: &std::path::Path, mode: nn::fs::OpenMode) -> Result<*mut FAccessor, AccessorResult>;
 }
