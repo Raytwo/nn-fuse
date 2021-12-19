@@ -1,15 +1,13 @@
-use std::ffi::CStr;
-
 use crate::{ fs, AccessorResult, FsEntryType };
 
 mod file;
 mod directory;
 
 pub use file::{ FileAccessor, FAccessor };
+pub use directory::{DAccessor, DirectoryAccessor };
 
+use std::ffi::CStr;
 use skyline::{nn, println};
-
-pub use directory::DAccessor;
 
 #[repr(C)]
 struct FsAccessorVtable {
