@@ -87,25 +87,89 @@ impl FsAccessor {
         fs::detail::free(self);   
     }
 
+    extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
+        println!("FsAccessor::get_entry_type");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        match self.accessor.get_entry_type(&filepath.strip_prefix("/").unwrap()) {
+            Ok(result) => {
+                *entry_type = result;
+                AccessorResult::Success
+            },
+            Err(e) => e,
+        }
+    }
+
     extern "C" fn create_file(&mut self, path: *const u8, size: usize, mode: i32) -> AccessorResult {
-        panic!("FsAccessor");
-        AccessorResult::Unimplemented
+        println!("FsAccessor::create_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        self.accessor.create_file(&filepath, size)
+    }
+    
+    extern "C" fn open_file(&mut self, file_accessor: *mut *mut FAccessor, path: *const u8, mode: nn::fs::OpenMode) -> AccessorResult { // unique_accessor is actually std::unique_ptr
+        println!("FsAccessor::open_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        match self.accessor.open_file(&filepath.strip_prefix("/").unwrap(), mode) {
+            Ok(mut accessor) => {
+                unsafe { *file_accessor = &mut *accessor };
+                AccessorResult::Success
+            },
+            Err(e) => e,
+        }
+    }
+
+    extern "C" fn rename_file(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
+        println!("FsAccessor::rename_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+        let new_filepath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
+
+        self.accessor.rename_file(&filepath, &new_filepath)
     }
 
     extern "C" fn delete_file(&mut self, path: *const u8) -> AccessorResult {
-        panic!("FsAccessor");
-        AccessorResult::Unimplemented
+        println!("FsAccessor::delete_file");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        self.accessor.delete_file(&filepath)
     }
 
     extern "C" fn create_directory(&mut self, path: *const u8) -> AccessorResult {
-        panic!("FsAccessor");
-        AccessorResult::Unimplemented
+        println!("FsAccessor::delete_directory");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        self.accessor.delete_directory(&filepath)
+    }
+
+    extern "C" fn open_directory(&mut self, directory_accessor: *mut *mut DAccessor, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
+        println!("FsAccessor::open_directory");
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        match self.accessor.open_directory(&filepath.strip_prefix("/").unwrap(), mode) {
+            Ok(mut accessor) => {
+                unsafe { *directory_accessor = &mut *accessor };
+                AccessorResult::Success
+            },
+            Err(e) => e,
+        }
+    }
+
+    extern "C" fn rename_directory(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
+        println!("FsAccessor::rename_directory");
+
+        let dir_path: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+        let new_dirpath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
+
+        self.accessor.rename_directory(&dir_path, &new_dirpath)
     }
 
     extern "C" fn delete_directory(&mut self, path: *const u8) -> AccessorResult {
-        panic!("FsAccessor");
+        println!("FsAccessor::delete_directory");
 
-        AccessorResult::Unimplemented
+        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
+
+        self.accessor.delete_directory(&filepath)
     }
 
     extern "C" fn delete_directory_recursively(&mut self, path: *const u8) -> AccessorResult {
@@ -120,36 +184,6 @@ impl FsAccessor {
         AccessorResult::Unimplemented
     }
 
-    extern "C" fn rename_file(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
-        println!("FsAccessor::rename_file");
-        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
-        let new_filepath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
-
-        self.accessor.rename_file(&filepath, &new_filepath)
-    }
-
-    extern "C" fn rename_directory(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
-        println!("FsAccessor::rename_directory");
-
-        let dir_path: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
-        let new_dirpath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
-
-        self.accessor.rename_directory(&dir_path, &new_dirpath)
-    }
-
-    extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
-        println!("FsAccessor::get_entry_type");
-        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
-
-        match self.accessor.get_entry_type(&filepath.strip_prefix("/").unwrap()) {
-            Ok(result) => {
-                *entry_type = result;
-                AccessorResult::Ok
-            },
-            Err(e) => e,
-        }
-    }
-
     extern "C" fn get_free_space_size(&mut self, out_size: &mut usize, path: *const u8) -> AccessorResult {
         panic!("FsAccessor");
 
@@ -160,32 +194,6 @@ impl FsAccessor {
         panic!("FsAccessor");
 
         AccessorResult::Unimplemented
-    }
-
-    extern "C" fn open_file(&mut self, file_accessor: *mut *mut FAccessor, path: *const u8, mode: nn::fs::OpenMode) -> AccessorResult { // unique_accessor is actually std::unique_ptr
-        println!("FsAccessor::open_file");
-        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
-
-        match self.accessor.open_file(&filepath.strip_prefix("/").unwrap(), mode) {
-            Ok(mut accessor) => {
-                unsafe { *file_accessor = &mut *accessor };
-                AccessorResult::Ok
-            },
-            Err(e) => e,
-        }
-    }
-
-    extern "C" fn open_directory(&mut self, directory_accessor: *mut *mut DAccessor, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
-        println!("FsAccessor::open_directory");
-        let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
-
-        match self.accessor.open_directory(&filepath.strip_prefix("/").unwrap(), mode) {
-            Ok(mut accessor) => {
-                unsafe { *directory_accessor = &mut *accessor };
-                AccessorResult::Ok
-            },
-            Err(e) => e,
-        }
     }
 
     extern "C" fn commit(&mut self) -> AccessorResult {
@@ -227,12 +235,24 @@ impl FsAccessor {
 
 pub trait FileSystemAccessor {
     fn get_entry_type(&self, path: &std::path::Path) -> Result<FsEntryType, AccessorResult>;
+    fn create_file(&self, path: &std::path::Path, size: usize) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
     fn open_file(&self, path: &std::path::Path, mode: nn::fs::OpenMode) -> Result<*mut FAccessor, AccessorResult>;
-    fn open_directory(&self, path: &std::path::Path, mode: nn::fs::OpenDirectoryMode) -> Result<*mut DAccessor, AccessorResult>;
     fn rename_file(&self, path: &std::path::Path, new_path: &std::path::Path) -> AccessorResult {
         AccessorResult::Unimplemented
     }
+    fn delete_file(&self, path: &std::path::Path) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
+    fn create_directory(&self, path: &std::path::Path) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
+    fn open_directory(&self, path: &std::path::Path, mode: nn::fs::OpenDirectoryMode) -> Result<*mut DAccessor, AccessorResult>;
     fn rename_directory(&self, path: &std::path::Path, new_path: &std::path::Path) -> AccessorResult {
+        AccessorResult::Unimplemented
+    }
+    fn delete_directory(&self, path: &std::path::Path) -> AccessorResult {
         AccessorResult::Unimplemented
     }
 }

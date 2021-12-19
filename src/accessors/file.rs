@@ -29,6 +29,7 @@ static FACCESSOR_VTABLE: FileAccessorVtable  = FileAccessorVtable {
 #[repr(C)]
 pub struct FAccessor {
     vtable: &'static FileAccessorVtable,
+    options: nn::fs::OpenMode,
     accessor: Box<dyn FileAccessor>,
 }
 
@@ -40,6 +41,7 @@ impl FAccessor {
         unsafe {
             out.write(Self {
                 vtable: &FACCESSOR_VTABLE,
+                options,
                 accessor: Box::new(accessor) as _,
             });
         }
@@ -82,9 +84,9 @@ impl FAccessor {
     }
 
     extern "C" fn flush(&mut self) -> AccessorResult {
-        panic!("FAccessor");
+        println!("FAccessor::flush");
 
-        AccessorResult::Unimplemented
+        self.accessor.flush()
     }
 
     extern "C" fn set_size(&mut self, new_size: usize) -> AccessorResult {
@@ -116,23 +118,19 @@ impl FAccessor {
 }
 
 pub trait FileAccessor {
-    fn read(&mut self, buffer: &mut [u8], offset: isize) -> Result<usize, AccessorResult> {
-        Err(AccessorResult::Unimplemented)
-    }
+    fn read(&mut self, buffer: &mut [u8], offset: isize) -> Result<usize, AccessorResult>;
 
     fn write(&mut self, data: &[u8], offset: isize, should_append: bool) -> Result<(), AccessorResult> {
-        Err(AccessorResult::Unimplemented)
-    }
-
-    fn flush(&mut self) -> Result<(), AccessorResult> {
-        Err(AccessorResult::Unimplemented)
+        Err(AccessorResult::Unsupported)
     }
 
     fn set_size(&mut self, new_size: usize) -> Result<(), AccessorResult> {
-        Err(AccessorResult::Unimplemented)
+        Err(AccessorResult::Unsupported)
     }
 
-    fn get_size(&mut self) -> Result<usize, AccessorResult> {
-        Err(AccessorResult::Unimplemented)
+    fn get_size(&mut self) -> Result<usize, AccessorResult>;
+
+    fn flush(&mut self) -> AccessorResult {
+        AccessorResult::Unsupported
     }
 }
