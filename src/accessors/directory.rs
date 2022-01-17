@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+use std::io::Write;
+
 use crate::{ fs, AccessorResult };
 
 use skyline::nn;
@@ -22,6 +25,27 @@ static DACCESSOR_VTABLE: DirectoryAccessorVtable = DirectoryAccessorVtable {
 pub struct DAccessor {
     vtable: &'static DirectoryAccessorVtable,
     accessor: Box<dyn DirectoryAccessor>,
+}
+
+#[derive(Copy, Clone)]
+pub enum DirectoryEntryType {
+    File(i64),
+    Directory
+}
+
+#[derive(Clone)]
+pub struct DirectoryEntry {
+    pub path: PathBuf,
+    pub ty: DirectoryEntryType
+}
+
+impl DirectoryEntry {
+    pub fn new() -> Self {
+        DirectoryEntry {
+            path: PathBuf::new(),
+            ty: DirectoryEntryType::Directory
+        }
+    }
 }
 
 
@@ -49,13 +73,50 @@ impl DAccessor {
     }
 
     extern "C" fn read(&mut self, out_count: &mut isize, buffer: *mut nn::fs::DirectoryEntry, buffer_len: usize) -> AccessorResult {
-        AccessorResult::Unimplemented
+        let mut buf = vec![DirectoryEntry::new(); buffer_len];
+        let mut buffer = unsafe {
+            std::slice::from_raw_parts_mut(buffer, buffer_len)
+        };
+        match self.accessor.read(buf.as_mut_slice()) {
+            Ok(size) => {
+                for (idx, entry) in buf.iter().enumerate() {
+                    let mut char_buffer = &mut buffer[idx].name[..];
+                    char_buffer.fill(0);
+                    let string = entry.path
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap();
+                    char_buffer.write(string.as_bytes());
+                    char_buffer[string.len()] = 0;
+                    match entry.ty {
+                        DirectoryEntryType::Directory => buffer[idx].type_ = 0,
+                        DirectoryEntryType::File(size) => {
+                            buffer[idx].type_ = 1;
+                            buffer[idx].fileSize = size;
+                        }
+                    }
+                }
+                *out_count = buf.len() as isize;
+            },
+            Err(e) => return e,
+        }
+        AccessorResult::Success
     }
 
     extern "C" fn get_entry_count(&mut self, out_count: &mut isize) -> AccessorResult {
-        AccessorResult::Unimplemented
+        match self.accessor.get_entry_count() {
+            Ok(size) => {
+                *out_count = size as isize;
+                AccessorResult::Success
+            },
+            Err(e) => e
+        }
     }
 }
 
 pub trait DirectoryAccessor {
+    fn read(&mut self, buffer: &mut [DirectoryEntry]) -> Result<usize, AccessorResult>;
+
+    fn get_entry_count(&mut self) -> Result<usize, AccessorResult>;
 }

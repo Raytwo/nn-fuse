@@ -4,7 +4,7 @@ mod file;
 mod directory;
 
 pub use file::{ FileAccessor, FAccessor };
-pub use directory::{DAccessor, DirectoryAccessor };
+pub use directory::{DAccessor, DirectoryAccessor, DirectoryEntry, DirectoryEntryType };
 
 use std::ffi::CStr;
 use skyline::{nn, println};
@@ -88,7 +88,6 @@ impl FsAccessor {
     }
 
     extern "C" fn get_entry_type(&mut self, entry_type: &mut FsEntryType, path: *const u8) -> AccessorResult {
-        println!("FsAccessor::get_entry_type");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         match self.accessor.get_entry_type(&filepath.strip_prefix("/").unwrap()) {
@@ -101,14 +100,12 @@ impl FsAccessor {
     }
 
     extern "C" fn create_file(&mut self, path: *const u8, size: usize, mode: i32) -> AccessorResult {
-        println!("FsAccessor::create_file");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         self.accessor.create_file(&filepath, size)
     }
     
     extern "C" fn open_file(&mut self, file_accessor: *mut *mut FAccessor, path: *const u8, mode: nn::fs::OpenMode) -> AccessorResult { // unique_accessor is actually std::unique_ptr
-        println!("FsAccessor::open_file");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         match self.accessor.open_file(&filepath.strip_prefix("/").unwrap(), mode) {
@@ -121,7 +118,6 @@ impl FsAccessor {
     }
 
     extern "C" fn rename_file(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
-        println!("FsAccessor::rename_file");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
         let new_filepath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
 
@@ -129,21 +125,18 @@ impl FsAccessor {
     }
 
     extern "C" fn delete_file(&mut self, path: *const u8) -> AccessorResult {
-        println!("FsAccessor::delete_file");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         self.accessor.delete_file(&filepath)
     }
 
     extern "C" fn create_directory(&mut self, path: *const u8) -> AccessorResult {
-        println!("FsAccessor::delete_directory");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         self.accessor.delete_directory(&filepath)
     }
 
     extern "C" fn open_directory(&mut self, directory_accessor: *mut *mut DAccessor, path: *const u8, mode: nn::fs::OpenDirectoryMode) -> AccessorResult {
-        println!("FsAccessor::open_directory");
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
         match self.accessor.open_directory(&filepath.strip_prefix("/").unwrap(), mode) {
@@ -156,7 +149,6 @@ impl FsAccessor {
     }
 
     extern "C" fn rename_directory(&mut self, path: *const u8, new_path: *const u8) -> AccessorResult {
-        println!("FsAccessor::rename_directory");
 
         let dir_path: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
         let new_dirpath: std::path::PathBuf = unsafe { CStr::from_ptr(new_path as _).to_str().unwrap().into() };
@@ -165,7 +157,6 @@ impl FsAccessor {
     }
 
     extern "C" fn delete_directory(&mut self, path: *const u8) -> AccessorResult {
-        println!("FsAccessor::delete_directory");
 
         let filepath: std::path::PathBuf = unsafe { CStr::from_ptr(path as _).to_str().unwrap().into() };
 
