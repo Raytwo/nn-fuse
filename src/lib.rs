@@ -61,13 +61,13 @@ pub mod fs {
         use skyline::libc::c_char;
 
         extern "C" {
-            #[link_name = "\u{1}_ZN2nn2fs3fsa8RegisterEPKcPNS1_18IMultiCommitTargetEONSt3__110unique_ptrINS1_11IFileSystemENS6_14default_deleteIS8_EEEEONS7_INS1_25ICommonMountNameGeneratorENS9_ISD_EEEEbb"]
-            fn register_fsa(mount_name: *const c_char, commit_target: *mut u8, unique_fs_ptr: *mut *mut u8, unique_generator_ptr: *mut *mut u8, unk1: bool, unk2: bool) -> u32;
+            #[link_name = "\u{1}_ZN2nn2fs3fsa8RegisterEPKcONSt3__110unique_ptrINS1_11IFileSystemENS4_14default_deleteIS6_EEEE"]
+            fn register_fsa(mount_name: *const c_char, unique_fs_ptr: *mut *mut u8) -> u32;
         }
 
         pub fn register<S: AsRef<str>, T>(mount_name: S, fsa: *mut T) -> u32 {
             unsafe {
-                register_fsa([mount_name.as_ref(), "\0"].concat().as_ptr(), 0 as _, &mut (fsa as *mut u8), &mut (0 as *mut u8), true, true)
+                register_fsa([mount_name.as_ref(), "\0"].concat().as_ptr(), &mut (fsa as *mut u8))
             }
         }
     }
