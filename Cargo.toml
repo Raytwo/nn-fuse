@@ -5,4 +5,4 @@ authors = ["Raytwo <raytwo@arcropolis.com>, blujay <the.blu.dev@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-skyline = "0.2.1"
+skyline = { git = "https://github.com/Raytwo/skyline-rs", branch="preview" }
