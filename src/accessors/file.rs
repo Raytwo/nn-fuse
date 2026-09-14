@@ -50,7 +50,9 @@ impl FAccessor {
         out
     }
 
-    extern "C" fn destructor(&mut self) { }
+    extern "C" fn destructor(&mut self) {
+        unsafe { std::ptr::drop_in_place(&mut self.accessor) }
+    }
 
     extern "C" fn deleter(&mut self) {
         self.destructor();
