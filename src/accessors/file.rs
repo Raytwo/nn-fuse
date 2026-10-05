@@ -60,9 +60,9 @@ impl FAccessor {
     }
 
     extern "C" fn read(&mut self, read_size: &mut usize, offset: usize, buffer: *mut u8, buffer_len: usize, read_options: u32) -> AccessorResult {
-        println!("FAccessor::read");
+        // println!("FAccessor::read");
         let buffer = unsafe { std::slice::from_raw_parts_mut(buffer, buffer_len) };
-        
+
         match self.accessor.read(buffer, offset) {
             Ok(size) => {
                 *read_size = size;
@@ -73,7 +73,7 @@ impl FAccessor {
     }
 
     extern "C" fn write(&mut self, offset: usize, data: *const u8, data_len: usize, write_options: &nn::fs::WriteOption) -> AccessorResult {
-        println!("FAccessor::write");
+        // println!("FAccessor::write");
 
         let data = unsafe {
             std::slice::from_raw_parts(data, data_len)
@@ -86,13 +86,13 @@ impl FAccessor {
     }
 
     extern "C" fn flush(&mut self) -> AccessorResult {
-        println!("FAccessor::flush");
+        // println!("FAccessor::flush");
 
         self.accessor.flush()
     }
 
     extern "C" fn set_size(&mut self, new_size: usize) -> AccessorResult {
-        println!("FAccessor::set_size");
+        // println!("FAccessor::set_size");
 
         match self.accessor.set_size(new_size) {
             Ok(()) => AccessorResult::Success,
@@ -101,7 +101,7 @@ impl FAccessor {
     }
 
     extern "C" fn get_size(&mut self, out_size: &mut usize) -> AccessorResult {
-        println!("FAccessor::get_size");
+        // println!("FAccessor::get_size");
 
         match unsafe { (*self.accessor).get_size() } {
             Ok(size) => {
